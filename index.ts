@@ -2,17 +2,19 @@ import {
   ErrorHandler,
   HandlerInput,
   RequestHandler,
-  SkillBuilders
+  SkillBuilders,
+  getSlotValue,
+  getDeviceId,
 } from "ask-sdk-core";
 import { Response, SessionEndedRequest } from "ask-sdk-model";
+import axios from "axios";
 
 const LaunchRequestHandler: RequestHandler = {
   canHandle(handlerInput: HandlerInput): boolean {
     return handlerInput.requestEnvelope.request.type === "LaunchRequest";
   },
   handle(handlerInput: HandlerInput): Response {
-    const speechText =
-      "Welcome to the My Weather! The actual weather will be coming soon";
+    const speechText = "Welcome to My Weather! Which city are you living in?";
 
     return (
       handlerInput.responseBuilder
@@ -20,7 +22,33 @@ const LaunchRequestHandler: RequestHandler = {
         //.reprompt(speechText)
         .getResponse()
     );
-  }
+  },
+};
+
+const GetCityIntentHandler: RequestHandler = {
+  canHandle(handlerInput: HandlerInput): boolean {
+    return (
+      handlerInput.requestEnvelope.request.type === "IntentRequest" &&
+      handlerInput.requestEnvelope.request.intent.name === "GetCityIntent"
+    );
+  },
+  async handle(handlerInput: HandlerInput): Promise<Response> {
+    const cityName = getSlotValue(handlerInput.requestEnvelope, "city");
+    const apiKey = process.env.APIKEY;
+    const uri = `api.openweathermap.org/data/2.5/weather?q=${cityName}&appid=${apiKey}`;
+    let weatherData;
+    try {
+      weatherData = await axios.get(uri);
+    } catch (err) {
+      console.log(err);
+      return handlerInput.responseBuilder
+        .speak("There was an error connecting to OpenWeather.")
+        .getResponse();
+    }
+    return handlerInput.responseBuilder
+      .speak("Weather data is avaliable, please process it further")
+      .getResponse();
+  },
 };
 
 const HelpIntentHandler: RequestHandler = {
@@ -37,7 +65,7 @@ const HelpIntentHandler: RequestHandler = {
       .speak(speechText)
       .reprompt(speechText)
       .getResponse();
-  }
+  },
 };
 
 const CancelAndStopIntentHandler: RequestHandler = {
@@ -58,7 +86,7 @@ const CancelAndStopIntentHandler: RequestHandler = {
       .withSimpleCard("Hello World", speechText)
       .withShouldEndSession(true)
       .getResponse();
-  }
+  },
 };
 
 const SessionEndedRequestHandler: RequestHandler = {
@@ -73,7 +101,7 @@ const SessionEndedRequestHandler: RequestHandler = {
     );
 
     return handlerInput.responseBuilder.getResponse();
-  }
+  },
 };
 
 const ErrorHandler: ErrorHandler = {
@@ -87,12 +115,13 @@ const ErrorHandler: ErrorHandler = {
       .speak("Sorry, I can't understand the command. Please say again.")
       .reprompt("Sorry, I can't understand the command. Please say again.")
       .getResponse();
-  }
+  },
 };
 
 export const handler = SkillBuilders.custom()
   .addRequestHandlers(
     LaunchRequestHandler,
+    GetCityIntentHandler,
     HelpIntentHandler,
     CancelAndStopIntentHandler,
     SessionEndedRequestHandler
